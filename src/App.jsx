@@ -181,8 +181,8 @@ function InlineTimer({ sess, color, onClose }) {
 
   async function openFullscreen() {
     try {
-      if (screen.orientation && screen.orientation.lock) {
-        await screen.orientation.lock("landscape");
+      if (window.screen.orientation && window.screen.orientation.lock) {
+        await window.screen.orientation.lock("landscape");
       }
     } catch (e) { /* bazı tarayıcılar desteklemez, sessizce geç */ }
     setFullscreen(true);
@@ -191,8 +191,8 @@ function InlineTimer({ sess, color, onClose }) {
   async function closeFullscreen() {
     setFullscreen(false);
     try {
-      if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
+      if (window.screen.orientation && window.screen.orientation.unlock) {
+        window.screen.orientation.unlock();
       }
     } catch (e) {}
   }
