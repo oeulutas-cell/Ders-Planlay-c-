@@ -376,7 +376,7 @@ export default function App() {
   ];
 
   return (
-    <div style={{ minHeight:"100vh", minHeight:"100dvh", background:"#0F0F1A", display:"flex", flexDirection:"column", fontFamily:"'SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", maxWidth:480, margin:"0 auto", position:"relative" }}>
+    <div style={{ minHeight:"100dvh", background:"#0F0F1A", display:"flex", flexDirection:"column", fontFamily:"'SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", maxWidth:480, margin:"0 auto", position:"relative" }}>
       <div style={{ flex:1, display:"flex", flexDirection:"column", position:"relative", overflow:"hidden" }}>
 
         {/* Safe area top spacer */}
