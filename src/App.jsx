@@ -1,5 +1,54 @@
 import { useState, useEffect, useRef } from "react";
 
+/* ── Arka planda çalışmayı sürdürmek için sessiz ses ── */
+function useWakeLock() {
+  const wakeLockRef = useRef(null);
+
+  async function request() {
+    // 1) Screen Wake Lock API (en iyi yöntem)
+    try {
+      if ("wakeLock" in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+        return;
+      }
+    } catch (e) {}
+
+    // 2) Web Audio API fallback – sıfır ses çalar, sayfa aktif kalır
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.loop = true;
+      src.start(0);
+      wakeLockRef.current = { type: "audio", ctx, src };
+    } catch (e) {}
+  }
+
+  function release() {
+    try {
+      if (!wakeLockRef.current) return;
+      if (wakeLockRef.current.type === "audio") {
+        wakeLockRef.current.src.stop();
+        wakeLockRef.current.ctx.close();
+      } else {
+        wakeLockRef.current.release();
+      }
+      wakeLockRef.current = null;
+    } catch (e) {}
+  }
+
+  // Uygulama tekrar öne gelince wake lock yenile
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible" && wakeLockRef.current) request(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  return { request, release };
+}
+
 const SUBJECTS = [
   {
     id: "mat", name: "Matematik", emoji: "📐", color: "#FF6B6B",
@@ -100,6 +149,7 @@ function InlineTimer({ sess, color, onClose }) {
   const [phase,      setPhase]      = useState("idle");
   const [fullscreen, setFullscreen] = useState(false);
   const ref = useRef(null);
+  const wakeLock = useWakeLock();
 
   const remain = Math.max(total - elapsed, 0);
   const pct    = elapsed / Math.max(total, 1);
@@ -108,14 +158,18 @@ function InlineTimer({ sess, color, onClose }) {
 
   useEffect(() => {
     if (running) {
+      wakeLock.request();
       ref.current = setInterval(() => {
         setElapsed(e => {
           if (e + 1 >= total) { clearInterval(ref.current); setRunning(false); setPhase("done"); return total; }
           return e + 1;
         });
       }, 1000);
-    } else { clearInterval(ref.current); }
-    return () => clearInterval(ref.current);
+    } else {
+      clearInterval(ref.current);
+      wakeLock.release();
+    }
+    return () => { clearInterval(ref.current); wakeLock.release(); };
   }, [running, total]);
 
   function handlePlay() {
@@ -124,6 +178,24 @@ function InlineTimer({ sess, color, onClose }) {
     if (phase === "idle") setPhase("running");
   }
   function handleReset() { setRunning(false); setElapsed(0); setPhase("idle"); }
+
+  async function openFullscreen() {
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock("landscape");
+      }
+    } catch (e) { /* bazı tarayıcılar desteklemez, sessizce geç */ }
+    setFullscreen(true);
+  }
+
+  async function closeFullscreen() {
+    setFullscreen(false);
+    try {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch (e) {}
+  }
 
   /* ── shared timer body, rendered in both modes ── */
   function TimerBody({ fs }) {
@@ -204,7 +276,7 @@ function InlineTimer({ sess, color, onClose }) {
             <button onClick={handleReset}
               style={{ width: fs?54:38, height: fs?54:38, borderRadius: fs?18:12, background:"rgba(255,255,255,.1)", border:"none", color:"rgba(255,255,255,.6)", fontSize: fs?20:17, cursor:"pointer" }}>↺</button>
             {/* fullscreen toggle */}
-            <button onClick={() => setFullscreen(f => !f)}
+            <button onClick={() => fs ? closeFullscreen() : openFullscreen()}
               style={{ width: fs?54:38, height: fs?54:38, borderRadius: fs?18:12, background: fs?"rgba(255,255,255,.15)":"rgba(255,255,255,.07)", border:"none", color:"rgba(255,255,255,.7)", fontSize: fs?18:14, cursor:"pointer" }}>
               {fs ? "⊠" : "⛶"}
             </button>
@@ -240,14 +312,10 @@ function InlineTimer({ sess, color, onClose }) {
             display:"flex",
             alignItems:"center",
             justifyContent:"center",
-            /* rotate entire screen landscape */
-            transform:"rotate(90deg)",
-            transformOrigin:"center center",
           }}>
-          {/* inner landscape content: vw/vh are swapped after rotation */}
           <div style={{
-            width:"100vh",
-            height:"100vw",
+            width:"100%",
+            height:"100%",
             display:"flex",
             alignItems:"center",
             justifyContent:"center",
@@ -256,7 +324,7 @@ function InlineTimer({ sess, color, onClose }) {
             position:"relative",
           }}>
             <button
-              onClick={() => setFullscreen(false)}
+              onClick={closeFullscreen}
               style={{ position:"absolute", top:16, right:16, width:40, height:40, borderRadius:13, background:"rgba(255,255,255,.12)", border:"none", color:"rgba(255,255,255,.7)", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1 }}>
               ✕
             </button>
@@ -653,7 +721,7 @@ function AddModal({ selDay, onAdd, onClose }) {
           {/* Topic */}
           <div>
             <Label>KONU</Label>
-            <input value={topic} onChange={e=>setTopic(e.target.value)} placeholder="Örn: Denklemler"
+            <input value={topic} onChange={e=>setTopic(e.target.value)} placeholder="Örn: Denklemler (isteğe bağlı)"
               style={{ width:"100%", marginTop:8, background:"rgba(255,255,255,.06)", border:"1px solid rgba(255,255,255,.1)", borderRadius:14, padding:"12px 14px", color:"#fff", fontSize:15, outline:"none", boxSizing:"border-box" }}/>
           </div>
           {/* Count */}
