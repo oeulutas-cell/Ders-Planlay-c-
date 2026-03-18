@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 /* ── Arka planda çalışmayı sürdürmek için sessiz ses ── */
 function useWakeLock() {
