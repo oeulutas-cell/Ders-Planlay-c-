@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 /* ── Arka planda çalışmayı sürdürmek için sessiz ses ── */
 function useWakeLock() {
@@ -150,6 +150,8 @@ function InlineTimer({ sess, color, onClose }) {
   const [fullscreen, setFullscreen] = useState(false);
   const ref = useRef(null);
   const wakeLock = useWakeLock();
+  const wakeLockRef = useRef(wakeLock);
+  useEffect(() => { wakeLockRef.current = wakeLock; }, [wakeLock]);
 
   const remain = Math.max(total - elapsed, 0);
   const pct    = elapsed / Math.max(total, 1);
@@ -158,7 +160,7 @@ function InlineTimer({ sess, color, onClose }) {
 
   useEffect(() => {
     if (running) {
-      wakeLock.request();
+      wakeLockRef.current.request();
       ref.current = setInterval(() => {
         setElapsed(e => {
           if (e + 1 >= total) { clearInterval(ref.current); setRunning(false); setPhase("done"); return total; }
@@ -167,9 +169,9 @@ function InlineTimer({ sess, color, onClose }) {
       }, 1000);
     } else {
       clearInterval(ref.current);
-      wakeLock.release();
+      wakeLockRef.current.release();
     }
-    return () => { clearInterval(ref.current); wakeLock.release(); };
+    return () => { clearInterval(ref.current); wakeLockRef.current.release(); };
   }, [running, total]);
 
   function handlePlay() {
